@@ -4,7 +4,7 @@
 
 	<groupId>io.github.rahulsinghai</groupId>
 	<artifactId>jmeter.backendlistener.kafka</artifactId>
-	<version>1.0.2-SNAPSHOT</version>
+	<version>1.0.4</version>
 	<packaging>jar</packaging>
 
 	<name>${project.artifactId}</name>

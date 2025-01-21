@@ -9,7 +9,7 @@
     <!--logs/${ctx:testrun:-unknown}_${date:yyyyMMdd_HHmmss}_${ctx:application:-unknown}_${ctx:loadprofile:-Log}.log--></File>
   </Appenders>
   <Loggers>
-    <Root level="trace">
+    <Root level="info">
       <AppenderRef ref="File"/>
 	  <AppenderRef ref="Console"/>
     </Root>
