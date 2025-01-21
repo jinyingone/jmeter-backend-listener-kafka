@@ -18,6 +18,7 @@ package io.github.rahulsinghai.jmeter.backendlistener.kafka;
 
 import java.util.LinkedList;
 import java.util.List;
+
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
@@ -31,78 +32,81 @@ import org.slf4j.LoggerFactory;
  */
 class KafkaMetricPublisher {
 
-  private static final Logger logger = LoggerFactory.getLogger(KafkaMetricPublisher.class);
+    private static final Logger logger = LoggerFactory.getLogger(KafkaMetricPublisher.class);
 
-  private KafkaProducer<Long, String> producer;
-  private String topic;
-  private List<String> metricList;
+    private KafkaProducer<Long, String> producer;
+    private String topic;
+    private List<String> metricList;
 
-  KafkaMetricPublisher(KafkaProducer<Long, String> producer, String topic) {
-    this.producer = producer;
-    this.topic = topic;
-    this.metricList = new LinkedList<>();
-  }
-
-  /**
-   * This method returns the current size of the JSON documents list
-   *
-   * @return integer representing the size of the JSON documents list
-   */
-  public int getListSize() {
-    return this.metricList.size();
-  }
-
-  /** This method closes the producer */
-  public void closeProducer() {
-    this.producer.flush();
-    this.producer.close();
-  }
-
-  /** This method clears the JSON documents list */
-  public void clearList() {
-    this.metricList.clear();
-  }
-
-  /**
-   * This method adds a metric to the list (metricList).
-   *
-   * @param metric String parameter representing a JSON document for Kafka
-   */
-  public void addToList(String metric) {
-    this.metricList.add(metric);
-  }
-
-  /** This method publishes the documents present in the list (metricList). */
-  public void publishMetrics() {
-
-    long time = System.currentTimeMillis();
-    for (int i = 0; i < this.metricList.size(); i++) {
-      final ProducerRecord<Long, String> record =
-          new ProducerRecord<>(this.topic, i + time, metricList.get(i));
-      producer.send(
-          record,
-          (metadata, exception) -> {
-            long elapsedTime = System.currentTimeMillis() - time;
-            if (metadata != null) {
-              if (logger.isDebugEnabled()) {
-                logger.debug(
-                    "Record sent with (key=%s value=%s) "
-                        + "meta(partition=%d, offset=%d) time=%d\n",
-                    record.key(),
-                    record.value(),
-                    metadata.partition(),
-                    metadata.offset(),
-                    elapsedTime);
-              }
-            } else {
-              if (logger.isErrorEnabled()) {
-                logger.error("Exception: " + exception);
-                logger.error(
-                    "Kafka Backend Listener was unable to publish to the Kafka topic {}.",
-                    this.topic);
-              }
-            }
-          });
+    KafkaMetricPublisher(KafkaProducer<Long, String> producer, String topic) {
+        this.producer = producer;
+        this.topic = topic;
+        this.metricList = new LinkedList<>();
     }
-  }
+
+    /**
+     * This method returns the current size of the JSON documents list
+     *
+     * @return integer representing the size of the JSON documents list
+     */
+    public int getListSize() {
+        return this.metricList.size();
+    }
+
+    /**
+     * This method closes the producer
+     */
+    public void closeProducer() {
+        this.producer.flush();
+        this.producer.close();
+    }
+
+    /**
+     * This method clears the JSON documents list
+     */
+    public void clearList() {
+        this.metricList.clear();
+    }
+
+    /**
+     * This method adds a metric to the list (metricList).
+     *
+     * @param metric String parameter representing a JSON document for Kafka
+     */
+    public void addToList(String metric) {
+        this.metricList.add(metric);
+    }
+
+    /**
+     * This method publishes the documents present in the list (metricList).
+     */
+    public void publishMetrics() {
+        long time = System.currentTimeMillis();
+        for (String metric : metricList) {
+            final ProducerRecord<Long, String> record =
+                    new ProducerRecord<>(this.topic, metric);
+            producer.send(
+                    record,
+                    (metadata, exception) -> {
+                        long elapsedTime = System.currentTimeMillis() - time;
+                        if (metadata != null) {
+                            if (logger.isDebugEnabled()) {
+                                logger.debug("Record sent with (key={} value={}) meta(partition={}, offset={}) time={}",
+                                        record.key(),
+                                        record.value(),
+                                        metadata.partition(),
+                                        metadata.offset(),
+                                        elapsedTime);
+                            }
+                        } else {
+                            if (logger.isErrorEnabled()) {
+                                logger.error("Exception: " + exception);
+                                logger.error(
+                                        "Kafka Backend Listener was unable to publish to the Kafka topic {}.",
+                                        this.topic);
+                            }
+                        }
+                    });
+        }
+    }
 }
