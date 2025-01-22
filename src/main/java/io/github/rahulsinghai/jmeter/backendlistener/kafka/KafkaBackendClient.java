@@ -171,7 +171,7 @@ public class KafkaBackendClient extends AbstractBackendListenerClient {
   private static final Map<String, String> DEFAULT_ARGS = new LinkedHashMap<>();
 
   static {
-    DEFAULT_ARGS.put(KAFKA_ACKS_CONFIG, "1");
+    DEFAULT_ARGS.put(KAFKA_ACKS_CONFIG, "0");
     DEFAULT_ARGS.put(KAFKA_BOOTSTRAP_SERVERS_CONFIG, null);
     DEFAULT_ARGS.put(KAFKA_TOPIC, null);
     DEFAULT_ARGS.put(KAFKA_SAMPLE_FILTER, null);
@@ -320,11 +320,33 @@ public class KafkaBackendClient extends AbstractBackendListenerClient {
 
   @Override
   public void teardownTest(BackendListenerContext context) throws Exception {
-    if (this.publisher.getListSize() > 0) {
-      this.publisher.publishMetrics();
-    }
+    this.publisher.addToList((new Gson()).toJson(getCustomFields(context)));
+    this.publisher.publishMetrics();
     this.publisher.closeProducer();
     super.teardownTest(context);
+  }
+
+  private Map<String, Object> getCustomFields(BackendListenerContext context) {
+    Map<String, Object> result = new HashMap<>();
+    String servicePrefixName = "kafka.";
+    Iterator<String> pluginParameters = context.getParameterNamesIterator();
+    while (pluginParameters.hasNext()) {
+      String parameterName = pluginParameters.next();
+      if (!parameterName.startsWith(servicePrefixName)
+          && !context.getParameter(parameterName).trim().equals("")) {
+        String parameter = context.getParameter(parameterName).trim();
+        try {
+          result.put(parameterName, Long.valueOf(Long.parseLong(parameter)));
+        } catch (Exception e) {
+          if (logger.isDebugEnabled()) {
+            logger.debug("Cannot convert custom field to number");
+          }
+          result.put(parameterName, context.getParameter(parameterName).trim());
+        }
+      }
+    }
+    result.put("Completed", Boolean.valueOf(true));
+    return result;
   }
 
   /**
