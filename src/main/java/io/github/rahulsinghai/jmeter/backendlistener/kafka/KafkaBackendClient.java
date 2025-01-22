@@ -20,6 +20,7 @@ import com.google.common.base.Strings;
 import com.google.gson.Gson;
 import io.github.rahulsinghai.jmeter.backendlistener.model.MetricsRow;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.jmeter.config.Arguments;
@@ -289,32 +290,33 @@ public class KafkaBackendClient extends AbstractBackendListenerClient {
   @Override
   public void handleSampleResults(List<SampleResult> results, BackendListenerContext context) {
     long ts = System.currentTimeMillis();
-    long i = 0;
-    for (SampleResult sr : results) {
-      MetricsRow row =
-          new MetricsRow(
-              sr,
-              context.getParameter(KAFKA_TEST_MODE),
-              context.getParameter(KAFKA_TIMESTAMP),
-              this.buildNumber,
-              context.getBooleanParameter(KAFKA_PARSE_REQ_HEADERS, false),
-              context.getBooleanParameter(KAFKA_PARSE_RES_HEADERS, false),
-              fields);
+    AtomicLong counter = new AtomicLong();
+    results
+        .parallelStream()
+        .forEach(
+            sr -> {
+              MetricsRow row =
+                  new MetricsRow(
+                      sr,
+                      context.getParameter(KAFKA_TEST_MODE),
+                      context.getParameter(KAFKA_TIMESTAMP),
+                      this.buildNumber,
+                      context.getBooleanParameter(KAFKA_PARSE_REQ_HEADERS, false),
+                      context.getBooleanParameter(KAFKA_PARSE_RES_HEADERS, false),
+                      fields);
 
-      if (validateSample(context, sr)) {
-        try {
-          // Prefix to skip from adding service specific parameters to the metrics row
-          String servicePrefixName = "kafka.";
-          String metric = GSON.toJson(row.getRowAsMap(context, servicePrefixName));
-          this.publisher.publishMetric(metric, ts + i);
-          i++;
-        } catch (Exception e) {
-          logger.error(
-              "The Kafka Backend Listener was unable to add sampler to the list of samplers to send... More info in JMeter's console.");
-          e.printStackTrace();
-        }
-      }
-    }
+              if (validateSample(context, sr)) {
+                try {
+                  // Prefix to skip from adding service specific parameters to the metrics row
+                  String servicePrefixName = "kafka.";
+                  String metric = GSON.toJson(row.getRowAsMap(context, servicePrefixName));
+                  this.publisher.publishMetric(metric, ts + counter.incrementAndGet());
+                } catch (Exception e) {
+                  logger.error(
+                      "The Kafka Backend Listener was unable to add sampler to the list of samplers to send... More info in JMeter's console.");
+                }
+              }
+            });
   }
 
   @Override
