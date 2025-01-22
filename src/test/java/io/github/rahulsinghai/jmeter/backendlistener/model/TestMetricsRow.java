@@ -19,9 +19,9 @@ package io.github.rahulsinghai.jmeter.backendlistener.model;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
+import com.google.gson.JsonObject;
 import java.net.UnknownHostException;
 import java.util.HashSet;
-import java.util.Map;
 import org.apache.jmeter.assertions.AssertionResult;
 import org.apache.jmeter.config.Arguments;
 import org.apache.jmeter.samplers.SampleResult;
@@ -71,10 +71,10 @@ public class TestMetricsRow {
     MetricsRow metricsRow =
         new MetricsRow(
             sampleResult, "info", "yyyy-MM-dd'T'HH:mm:ss.SSSZZ", 0, false, false, new HashSet<>());
-    Map<String, Object> mapMetric = metricsRow.getRowAsMap(context, servicePrefixName);
+    JsonObject mapMetric = metricsRow.getRowAsMap(context, servicePrefixName);
     assertNotNull(mapMetric);
     assertNotNull(mapMetric.get("SampleLabel"));
-    assertEquals(mapMetric.get("SampleLabel").toString(), "Test Sample");
+    assertEquals(mapMetric.get("SampleLabel").getAsString(), "Test Sample");
   }
 
   @Test
@@ -97,9 +97,9 @@ public class TestMetricsRow {
     MetricsRow metricsRow =
         new MetricsRow(
             sampleResult, "error", "yyyy-MM-dd'T'HH:mm:ss.SSSZZ", 1, false, true, new HashSet<>());
-    Map<String, Object> mapMetric = metricsRow.getRowAsMap(context, servicePrefixName);
+    JsonObject mapMetric = metricsRow.getRowAsMap(context, servicePrefixName);
     assertNotNull(mapMetric);
     assertNotNull(mapMetric.get("SampleLabel"));
-    assertEquals(mapMetric.get("SampleLabel").toString(), "Test Sample");
+    assertEquals(mapMetric.get("SampleLabel").getAsString(), "Test Sample");
   }
 }

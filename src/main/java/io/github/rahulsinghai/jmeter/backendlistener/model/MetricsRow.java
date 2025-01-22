@@ -16,6 +16,8 @@
 
 package io.github.rahulsinghai.jmeter.backendlistener.model;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.text.ParseException;
@@ -27,7 +29,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.Map;
 import java.util.Set;
 import org.apache.jmeter.assertions.AssertionResult;
 import org.apache.jmeter.samplers.SampleResult;
@@ -43,7 +44,7 @@ public class MetricsRow {
   private String kafkaTestMode;
   private String kafkaTimestamp;
   private int ciBuildNumber;
-  private HashMap<String, Object> metricsMap;
+  private JsonObject metricsJsonObj;
   private Set<String> fields;
   private boolean allReqHeaders;
   private boolean allResHeaders;
@@ -60,10 +61,10 @@ public class MetricsRow {
     this.kafkaTestMode = testMode.trim();
     this.kafkaTimestamp = timeStamp.trim();
     this.ciBuildNumber = buildNumber;
-    this.metricsMap = new HashMap<>();
     this.allReqHeaders = parseReqHeaders;
     this.allResHeaders = parseResHeaders;
     this.fields = fields;
+    metricsJsonObj = new JsonObject();
   }
 
   /**
@@ -75,36 +76,35 @@ public class MetricsRow {
    * @return A Map(String, Object) comprising all the metrics as key value objects
    * @throws UnknownHostException If unable to determine injector host name.
    */
-  public Map<String, Object> getRowAsMap(BackendListenerContext context, String servicePrefixName)
+  public JsonObject getRowAsMap(BackendListenerContext context, String servicePrefixName)
       throws UnknownHostException {
     SimpleDateFormat sdf = new SimpleDateFormat(this.kafkaTimestamp);
 
     // add all the default SampleResult parameters
-    addFilteredMetricToMetricsMap("AllThreads", this.sampleResult.getAllThreads());
-    addFilteredMetricToMetricsMap("BodySize", this.sampleResult.getBodySizeAsLong());
-    addFilteredMetricToMetricsMap("Bytes", this.sampleResult.getBytesAsLong());
-    addFilteredMetricToMetricsMap("SentBytes", this.sampleResult.getSentBytes());
-    addFilteredMetricToMetricsMap("ConnectTime", this.sampleResult.getConnectTime());
-    addFilteredMetricToMetricsMap("ContentType", this.sampleResult.getContentType());
-    addFilteredMetricToMetricsMap("DataType", this.sampleResult.getDataType());
-    addFilteredMetricToMetricsMap("ErrorCount", this.sampleResult.getErrorCount());
-    addFilteredMetricToMetricsMap("GrpThreads", this.sampleResult.getGroupThreads());
-    addFilteredMetricToMetricsMap("IdleTime", this.sampleResult.getIdleTime());
-    addFilteredMetricToMetricsMap("Latency", this.sampleResult.getLatency());
-    addFilteredMetricToMetricsMap("ResponseTime", this.sampleResult.getTime());
-    addFilteredMetricToMetricsMap("SampleCount", this.sampleResult.getSampleCount());
-    addFilteredMetricToMetricsMap("SampleLabel", this.sampleResult.getSampleLabel());
-    addFilteredMetricToMetricsMap("ThreadName", this.sampleResult.getThreadName());
-    addFilteredMetricToMetricsMap("URL", this.sampleResult.getURL());
-    addFilteredMetricToMetricsMap("ResponseCode", this.sampleResult.getResponseCode());
-    addFilteredMetricToMetricsMap("TestStartTime", JMeterContextService.getTestStartTime());
-    addFilteredMetricToMetricsMap(
+    metricsJsonObj.addProperty("AllThreads", this.sampleResult.getAllThreads());
+    metricsJsonObj.addProperty("BodySize", this.sampleResult.getBodySizeAsLong());
+    metricsJsonObj.addProperty("Bytes", this.sampleResult.getBytesAsLong());
+    metricsJsonObj.addProperty("SentBytes", this.sampleResult.getSentBytes());
+    metricsJsonObj.addProperty("ConnectTime", this.sampleResult.getConnectTime());
+    metricsJsonObj.addProperty("ContentType", this.sampleResult.getContentType());
+    metricsJsonObj.addProperty("DataType", this.sampleResult.getDataType());
+    metricsJsonObj.addProperty("ErrorCount", this.sampleResult.getErrorCount());
+    metricsJsonObj.addProperty("GrpThreads", this.sampleResult.getGroupThreads());
+    metricsJsonObj.addProperty("IdleTime", this.sampleResult.getIdleTime());
+    metricsJsonObj.addProperty("Latency", this.sampleResult.getLatency());
+    metricsJsonObj.addProperty("ResponseTime", this.sampleResult.getTime());
+    metricsJsonObj.addProperty("SampleCount", this.sampleResult.getSampleCount());
+    metricsJsonObj.addProperty("SampleLabel", this.sampleResult.getSampleLabel());
+    metricsJsonObj.addProperty("ThreadName", this.sampleResult.getThreadName());
+    metricsJsonObj.addProperty("URL", this.sampleResult.getUrlAsString());
+    metricsJsonObj.addProperty("ResponseCode", this.sampleResult.getResponseCode());
+    metricsJsonObj.addProperty("TestStartTime", JMeterContextService.getTestStartTime());
+    metricsJsonObj.addProperty(
         "SampleStartTime", sdf.format(new Date(this.sampleResult.getStartTime())));
-    addFilteredMetricToMetricsMap(
+    metricsJsonObj.addProperty(
         "SampleEndTime", sdf.format(new Date(this.sampleResult.getEndTime())));
-    addFilteredMetricToMetricsMap(
-        "Timestamp", sdf.format(new Date(this.sampleResult.getTimeStamp())));
-    addFilteredMetricToMetricsMap("InjectorHostname", InetAddress.getLocalHost().getHostName());
+    metricsJsonObj.addProperty("Timestamp", sdf.format(new Date(this.sampleResult.getTimeStamp())));
+    metricsJsonObj.addProperty("InjectorHostname", InetAddress.getLocalHost().getHostName());
 
     // Add the details according to the mode that is set
     switch (this.kafkaTestMode) {
@@ -126,7 +126,7 @@ public class MetricsRow {
     addCustomFields(context, servicePrefixName);
     parseHeadersAsJsonProps(this.allReqHeaders, this.allResHeaders);
 
-    return this.metricsMap;
+    return this.metricsJsonObj;
   }
 
   /** This method adds all the assertions for the current sampleResult */
@@ -134,25 +134,26 @@ public class MetricsRow {
     AssertionResult[] assertionResults = this.sampleResult.getAssertionResults();
     if (assertionResults != null) {
       @SuppressWarnings("unchecked")
-      HashMap<String, Object>[] assertionArray = new HashMap[assertionResults.length];
+      JsonArray assertionArray = new JsonArray(assertionResults.length);
       int i = 0;
       StringBuilder failureMessageStringBuilder = new StringBuilder();
       boolean isFailure = false;
       for (AssertionResult assertionResult : assertionResults) {
         HashMap<String, Object> assertionMap = new HashMap<>();
-        boolean failure = assertionResult.isFailure() || assertionResult.isError();
+        Boolean failure = assertionResult.isFailure() || assertionResult.isError();
         isFailure = isFailure || assertionResult.isFailure() || assertionResult.isError();
-        assertionMap.put("failure", failure);
-        assertionMap.put("failureMessage", assertionResult.getFailureMessage());
+        JsonObject assertionObj = new JsonObject();
+        assertionObj.addProperty("failure", failure);
+        assertionObj.addProperty("failureMessage", assertionResult.getFailureMessage());
         failureMessageStringBuilder.append(assertionResult.getFailureMessage());
         failureMessageStringBuilder.append("\n");
         assertionMap.put("name", assertionResult.getName());
-        assertionArray[i] = assertionMap;
+        assertionArray.add(assertionObj);
         i++;
       }
-      addFilteredMetricToMetricsMap("AssertionResults", assertionArray);
-      addFilteredMetricToMetricsMap("FailureMessage", failureMessageStringBuilder.toString());
-      addFilteredMetricToMetricsMap("Success", !isFailure);
+      metricsJsonObj.add("AssertionResults", assertionArray);
+      metricsJsonObj.addProperty("FailureMessage", failureMessageStringBuilder.toString());
+      metricsJsonObj.addProperty("Success", !isFailure);
     }
   }
 
@@ -168,16 +169,17 @@ public class MetricsRow {
 
     if (this.ciBuildNumber != 0) {
       elapsedTime = getElapsedTime(true);
-      addFilteredMetricToMetricsMap("BuildNumber", this.ciBuildNumber);
+
+      this.metricsJsonObj.addProperty("BuildNumber", this.ciBuildNumber);
 
       if (elapsedTime != null) {
-        addFilteredMetricToMetricsMap("ElapsedTimeComparison", sdf.format(elapsedTime));
+        this.metricsJsonObj.addProperty("ElapsedTimeComparison", sdf.format(elapsedTime));
       }
     }
 
     elapsedTime = getElapsedTime(false);
     if (elapsedTime != null) {
-      addFilteredMetricToMetricsMap("ElapsedTime", sdf.format(elapsedTime));
+      this.metricsJsonObj.addProperty("ElapsedTime", sdf.format(elapsedTime));
     }
   }
 
@@ -196,12 +198,13 @@ public class MetricsRow {
         String parameter = context.getParameter(parameterName).trim();
 
         try {
-          addFilteredMetricToMetricsMap(parameterName, Long.parseLong(parameter));
+          this.metricsJsonObj.addProperty(parameterName, Long.parseLong(parameter));
         } catch (Exception e) {
           if (logger.isDebugEnabled()) {
             logger.debug("Cannot convert custom field to number");
           }
-          addFilteredMetricToMetricsMap(parameterName, context.getParameter(parameterName).trim());
+          this.metricsJsonObj.addProperty(
+              parameterName, context.getParameter(parameterName).trim());
         }
       }
     }
@@ -209,11 +212,11 @@ public class MetricsRow {
 
   /** Method that adds the request and response's body/headers */
   private void addDetails() {
-    addFilteredMetricToMetricsMap("RequestHeaders", this.sampleResult.getRequestHeaders());
-    addFilteredMetricToMetricsMap("RequestBody", this.sampleResult.getSamplerData());
-    addFilteredMetricToMetricsMap("ResponseHeaders", this.sampleResult.getResponseHeaders());
-    addFilteredMetricToMetricsMap("ResponseBody", this.sampleResult.getResponseDataAsString());
-    addFilteredMetricToMetricsMap("ResponseMessage", this.sampleResult.getResponseMessage());
+    this.metricsJsonObj.addProperty("RequestHeaders", this.sampleResult.getRequestHeaders());
+    this.metricsJsonObj.addProperty("RequestBody", this.sampleResult.getSamplerData());
+    this.metricsJsonObj.addProperty("ResponseHeaders", this.sampleResult.getResponseHeaders());
+    this.metricsJsonObj.addProperty("ResponseBody", this.sampleResult.getResponseDataAsString());
+    this.metricsJsonObj.addProperty("ResponseMessage", this.sampleResult.getResponseMessage());
   }
 
   /**
@@ -246,22 +249,14 @@ public class MetricsRow {
         // if not all req headers and header contains special X-tag
         if (header.length > 1) {
           if (!this.allReqHeaders && header[0].startsWith("X-kafka-backend")) {
-            this.metricsMap.put(header[0].replaceAll("kafka-", "").trim(), header[1].trim());
+            this.metricsJsonObj.addProperty(
+                header[0].replaceAll("kafka-", "").trim(), header[1].trim());
           } else {
-            this.metricsMap.put(header[0].replaceAll("kafka-", "").trim(), header[1].trim());
+            this.metricsJsonObj.addProperty(
+                header[0].replaceAll("kafka-", "").trim(), header[1].trim());
           }
         }
       }
-    }
-  }
-
-  /**
-   * Adds a given key-value pair to metricsMap if the key is contained in the field filter or in
-   * case of empty field filter
-   */
-  private void addFilteredMetricToMetricsMap(String key, Object value) {
-    if (this.fields.size() == 0 || this.fields.contains(key.toLowerCase())) {
-      this.metricsMap.put(key, value);
     }
   }
 

@@ -43,6 +43,7 @@ import org.slf4j.LoggerFactory;
 public class KafkaBackendClient extends AbstractBackendListenerClient {
 
   private static final Logger logger = LoggerFactory.getLogger(KafkaBackendClient.class);
+  private static final Gson GSON = new Gson();
 
   private static final String BUILD_NUMBER = "BuildNumber";
 
@@ -300,7 +301,7 @@ public class KafkaBackendClient extends AbstractBackendListenerClient {
         try {
           // Prefix to skip from adding service specific parameters to the metrics row
           String servicePrefixName = "kafka.";
-          this.publisher.addToList(new Gson().toJson(row.getRowAsMap(context, servicePrefixName)));
+          this.publisher.addToList(GSON.toJson(row.getRowAsMap(context, servicePrefixName)));
         } catch (Exception e) {
           logger.error(
               "The Kafka Backend Listener was unable to add sampler to the list of samplers to send... More info in JMeter's console.");
