@@ -181,7 +181,6 @@ public class KafkaBackendClient extends AbstractBackendListenerClient {
     DEFAULT_ARGS.put(KAFKA_PARSE_REQ_HEADERS, "false");
     DEFAULT_ARGS.put(KAFKA_PARSE_RES_HEADERS, "false");
     DEFAULT_ARGS.put(KAFKA_TIMESTAMP, "yyyy-MM-dd'T'HH:mm:ss.SSSZZ");
-    DEFAULT_ARGS.put(KAFKA_COMPRESSION_TYPE_CONFIG, null);
     DEFAULT_ARGS.put(KAFKA_SSL_ENABLED, "false");
     DEFAULT_ARGS.put(KAFKA_SSL_KEY_PASSWORD, null);
     DEFAULT_ARGS.put(KAFKA_SSL_KEYSTORE_LOCATION, null);
@@ -193,9 +192,12 @@ public class KafkaBackendClient extends AbstractBackendListenerClient {
     DEFAULT_ARGS.put(KAFKA_SSL_PROTOCOL, "TLS");
     DEFAULT_ARGS.put(KAFKA_SSL_PROVIDER, null);
     DEFAULT_ARGS.put(KAFKA_SSL_TRUSTSTORE_TYPE, "JKS");
-    DEFAULT_ARGS.put(KAFKA_BATCH_SIZE_CONFIG, Integer.toString(16384));
     DEFAULT_ARGS.put(KAFKA_CLIENT_ID_CONFIG, "JMeterKafkaBackendListener");
     DEFAULT_ARGS.put(KAFKA_CONNECTIONS_MAX_IDLE_MS_CONFIG, Long.toString(180000L));
+
+    DEFAULT_ARGS.put(KAFKA_BATCH_SIZE_CONFIG, Integer.toString(32 * 1024));
+    DEFAULT_ARGS.put(KAFKA_COMPRESSION_TYPE_CONFIG, "gzip");
+    DEFAULT_ARGS.put("buffer.memory", Integer.toString(64 * 1024 * 1024));
   }
 
   private KafkaMetricPublisher publisher;
@@ -286,6 +288,8 @@ public class KafkaBackendClient extends AbstractBackendListenerClient {
 
   @Override
   public void handleSampleResults(List<SampleResult> results, BackendListenerContext context) {
+    long ts = System.currentTimeMillis();
+    long i = 0;
     for (SampleResult sr : results) {
       MetricsRow row =
           new MetricsRow(
@@ -301,7 +305,9 @@ public class KafkaBackendClient extends AbstractBackendListenerClient {
         try {
           // Prefix to skip from adding service specific parameters to the metrics row
           String servicePrefixName = "kafka.";
-          this.publisher.addToList(GSON.toJson(row.getRowAsMap(context, servicePrefixName)));
+          String metric = GSON.toJson(row.getRowAsMap(context, servicePrefixName));
+          this.publisher.publishMetric(metric, ts + i);
+          i++;
         } catch (Exception e) {
           logger.error(
               "The Kafka Backend Listener was unable to add sampler to the list of samplers to send... More info in JMeter's console.");
@@ -309,20 +315,12 @@ public class KafkaBackendClient extends AbstractBackendListenerClient {
         }
       }
     }
-
-    try {
-      this.publisher.publishMetrics();
-    } catch (Exception e) {
-      logger.error("Error occurred while publishing to Kafka topic.", e);
-    } finally {
-      this.publisher.clearList();
-    }
   }
 
   @Override
   public void teardownTest(BackendListenerContext context) throws Exception {
-    this.publisher.addToList((new Gson()).toJson(getCustomFields(context)));
-    this.publisher.publishMetrics();
+    this.publisher.publishMetric(
+        (new Gson().toJson(getCustomFields(context))), System.currentTimeMillis());
     this.publisher.closeProducer();
     super.teardownTest(context);
   }

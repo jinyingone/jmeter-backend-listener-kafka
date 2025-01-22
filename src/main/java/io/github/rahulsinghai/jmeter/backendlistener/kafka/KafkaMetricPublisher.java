@@ -105,4 +105,29 @@ class KafkaMetricPublisher {
           });
     }
   }
+
+  public void publishMetric(String metric, long key) {
+    final ProducerRecord<Long, String> record = new ProducerRecord<>(this.topic, key, metric);
+    producer.send(
+        record,
+        (metadata, exception) -> {
+          if (metadata != null) {
+            if (logger.isDebugEnabled()) {
+              logger.debug(
+                  "Record sent with (key={} value={}) meta(partition={}, offset={})",
+                  record.key(),
+                  record.value(),
+                  metadata.partition(),
+                  metadata.offset());
+            }
+          } else {
+            if (logger.isErrorEnabled()) {
+              logger.error("Exception: " + exception);
+              logger.error(
+                  "Kafka Backend Listener was unable to publish to the Kafka topic {}.",
+                  this.topic);
+            }
+          }
+        });
+  }
 }
